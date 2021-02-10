@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["BenHall-7 <Benjaminjahall@gmail.com>"]
 edition = "2018"
 
+[lib]
+name = "pyprc"
+crate-type = ["cdylib"]
+
 [dependencies]
 prc-rs = "1.3.2"
 pyo3 = { version = "0.13.1", features = ["extension-module"] }

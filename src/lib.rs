@@ -16,12 +16,8 @@ fn pyprc(_py: Python, m: &PyModule) -> PyResult<()> {
 
 #[pymethods]
 impl Param {
-    #[new]
-    fn new(value: &PyAny) -> PyResult<Self> {
-        Ok(Param { inner: ParamKind::from(true) })
-    }
-
-    fn from_file(_: PyRef<Self>, filename: String) -> PyResult<Self> {
+    #[staticmethod]
+    fn from_file(filename: &str) -> PyResult<Self> {
         let p = open(filename).map(ParamKind::from)?;
         Ok(Param { inner: p })
     }
@@ -34,3 +30,4 @@ impl Param {
         Ok(())
     }
 }
+
