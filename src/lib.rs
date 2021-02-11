@@ -1,6 +1,4 @@
 use prc::{open, save, ParamKind};
-#[macro_use]
-extern crate pyo3;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
