@@ -1,15 +1,15 @@
 use prc::hash40::Hash40;
 use prc::*;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
-#[pyclass]
+#[pyclass(name="param")]
 #[derive(Debug, Clone, PartialEq)]
 struct Param {
     inner: ParamKind,
 }
 
-#[pyclass]
+#[pyclass(name="hash")]
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct Hash {
     inner: Hash40,
@@ -68,13 +68,55 @@ impl Param {
         let ps = self
             .inner
             .try_into_ref()
-            .map_err(|_| PyValueError::new_err("Only struct-type Params can be saved to a file"))?;
+            .map_err(|_| PyTypeError::new_err("Only struct-type Params can be saved to a file"))?;
         save(filename, ps)?;
         Ok(())
     }
 
     fn clone(&self) -> Self {
         Param { inner: self.inner.clone() }
+    }
+
+    #[getter]
+    fn get_value(&self) -> PyResult<PyObject> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ob = match &self.inner {
+            ParamKind::Bool(v) => v.to_object(py),
+            ParamKind::I8(v) => v.to_object(py),
+            ParamKind::U8(v) => v.to_object(py),
+            ParamKind::I16(v) => v.to_object(py),
+            ParamKind::U16(v) => v.to_object(py),
+            ParamKind::I32(v) => v.to_object(py),
+            ParamKind::U32(v) => v.to_object(py),
+            ParamKind::Float(v) => v.to_object(py),
+            ParamKind::Hash(v) => PyCell::new(py, Hash { inner: *v }).unwrap().into(),
+            ParamKind::Str(v) => v.to_object(py),
+            ParamKind::List(_) => return Err(PyTypeError::new_err("Cannot access value on a list-type param")),
+            ParamKind::Struct(_) => return Err(PyTypeError::new_err("Cannot access value on a list-type param")),
+        };
+        Ok(ob)
+    }
+
+    #[setter]
+    fn set_value(&mut self, value: PyObject) -> PyResult<()> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        match &mut self.inner {
+            ParamKind::Bool(v) => *v = value.extract(py)?,
+            ParamKind::I8(v) => *v = value.extract(py)?,
+            ParamKind::U8(v) => *v = value.extract(py)?,
+            ParamKind::I16(v) => *v = value.extract(py)?,  
+            ParamKind::U16(v) => *v = value.extract(py)?,
+            ParamKind::I32(v) => *v = value.extract(py)?,
+            ParamKind::U32(v) => *v = value.extract(py)?,
+            ParamKind::Float(v) => *v = value.extract(py)?,
+            ParamKind::Hash(v) => *v = value.extract::<Hash>(py)?.inner,
+            ParamKind::Str(v) => *v = value.extract(py)?,
+            ParamKind::List(_) => return Err(PyTypeError::new_err("Cannot assign value on a list-type param")),
+            ParamKind::Struct(_) => return Err(PyTypeError::new_err("Cannot assign value on a list-type param")),
+        }
+        Ok(())
     }
 }
 
