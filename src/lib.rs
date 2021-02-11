@@ -3,13 +3,13 @@ use prc::*;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
-#[pyclass(name="param")]
+#[pyclass(name = "param")]
 #[derive(Debug, Clone, PartialEq)]
 struct Param {
     inner: ParamKind,
 }
 
-#[pyclass(name="hash")]
+#[pyclass(name = "hash")]
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct Hash {
     inner: Hash40,
@@ -106,7 +106,7 @@ impl Param {
             ParamKind::Bool(v) => *v = value.extract(py)?,
             ParamKind::I8(v) => *v = value.extract(py)?,
             ParamKind::U8(v) => *v = value.extract(py)?,
-            ParamKind::I16(v) => *v = value.extract(py)?,  
+            ParamKind::I16(v) => *v = value.extract(py)?,
             ParamKind::U16(v) => *v = value.extract(py)?,
             ParamKind::I32(v) => *v = value.extract(py)?,
             ParamKind::U32(v) => *v = value.extract(py)?,
