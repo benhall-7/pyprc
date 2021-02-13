@@ -1,10 +1,12 @@
 use std::sync::{Arc, Mutex};
+use std::vec::IntoIter;
 use prc::*;
 use prc::hash40::{Hash40, to_hash40};
 use pyo3::prelude::*;
+use pyo3::conversion::ToPyObject;
 use pyo3::class::{PyMappingProtocol, PyIterProtocol};
 use pyo3::exceptions::{PyIndexError, PyTypeError};
-use pyo3::types::PyList;
+use pyo3::types::{PyList, PyTuple};
 
 #[pyclass(name = "param")]
 #[derive(Debug, Clone)]
@@ -136,6 +138,12 @@ fn pyprc(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Param>()?;
     m.add_class::<Hash>()?;
     Ok(())
+}
+
+impl Param {
+    fn clone_ref(&self) -> Self {
+        Param { inner: self.inner.clone() }
+    }
 }
 
 macro_rules! make_impl {
@@ -326,6 +334,48 @@ impl Hash {
         } else {
             Err(PyTypeError::new_err("Hash constructor accepts only string or unsigned int64"))
         }
+    }
+}
+
+// TODO
+// implement __iter__ on both Param and ParamIter
+
+#[pyclass]
+struct ParamIter {
+    inner: IntoIter<PyObject>
+}
+
+#[pyproto]
+impl<'a> PyIterProtocol<'a> for Param {
+    fn __iter__(this: PyRef<Self>) -> PyResult<Py<ParamIter>> {
+        let py = this.py();
+        match &*this.inner.lock().unwrap() {
+            ParamType::List(v) => {
+                let refs: IntoIter<PyObject> = v.0
+                    .iter()
+                    .map(|p| PyCell::new(py, Param { inner: p.inner.clone() }).unwrap().into())
+                    .collect::<Vec<_>>()
+                    .into_iter();
+                Py::new(py, ParamIter { inner: refs })
+            }
+            ParamType::Struct(v) => {
+                let refs: IntoIter<PyObject> = v.0
+                    .iter()
+                    .map(|(h, p)| [PyCell::new(py, *h).unwrap().into(), PyCell::new(py, p.clone_ref()).unwrap().into()])
+                    .map(|arr2: [PyObject; 2]| PyTuple::new(py, arr2.iter()).to_object(py))
+                    .collect::<Vec<_>>()
+                    .into_iter();
+                Py::new(py, ParamIter { inner: refs })
+            }
+            _ => Err(PyTypeError::new_err("Cannot iterate params other than list or struct-type params"))
+        }
+    }
+}
+
+#[pyproto]
+impl PyIterProtocol for ParamIter {
+    fn __next__(mut this: PyRefMut<Self>) -> PyResult<Option<PyObject>> {
+        Ok(this.inner.next())
     }
 }
 
