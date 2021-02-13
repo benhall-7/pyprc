@@ -273,7 +273,41 @@ impl<'a> PyMappingProtocol<'a> for Param {
                     Ok(PyList::new(py, col).into())
                 }
             }
-            _ => Err(PyTypeError::new_err("Cannot index other than list or struct-type params")),
+            _ => Err(PyTypeError::new_err("Cannot index params other than list or struct-type params")),
+        }
+    }
+
+    fn __setitem__(&mut self, key: PyObject, value: PyObject) -> PyResult<()> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        match &mut *self.inner.lock().unwrap() {
+            ParamType::List(v) => {
+                let index: usize = key.extract(py)?;
+                if index >= v.0.len() { 
+                    Err(PyIndexError::new_err("Index out of bounds").into())
+                } else {
+                    let set: Param = value.extract(py)?;
+                    v.0[index] = set;
+                    Ok(())
+                }
+            }
+            ParamType::Struct(v) => {
+                let index: Hash = key.extract(py)?;
+                let mut col: Vec<&mut Param> = v.0.iter_mut()
+                    .filter(|(hash, _)| *hash == index)
+                    .map(|(_, p)| p)
+                    .collect();
+                if col.is_empty() {
+                    Err(PyIndexError::new_err("Hash not found in child params"))
+                } else if col.len() == 1 {
+                    let set: Param = value.extract(py)?;
+                    *col[0] = set;
+                    Ok(())
+                } else {
+                    Err(PyTypeError::new_err("Cannot assign param to this hash; more than one match was found"))
+                }
+            }
+            _ => Err(PyTypeError::new_err("Cannot index params other than list or struct-type params")),
         }
     }
 }
