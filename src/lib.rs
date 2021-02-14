@@ -4,7 +4,7 @@ use prc::*;
 use prc::hash40::*;
 use pyo3::prelude::*;
 use pyo3::conversion::ToPyObject;
-use pyo3::class::{PyIterProtocol ,PyObjectProtocol, PyMappingProtocol};
+use pyo3::class::{basic::CompareOp, PyIterProtocol, PyObjectProtocol, PyMappingProtocol};
 use pyo3::exceptions::{PyIndexError, PyTypeError};
 use pyo3::types::{PyList, PyTuple};
 
@@ -14,7 +14,7 @@ struct Param {
     inner: Arc<Mutex<ParamType>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 /// an enum designed to store sub-params as reference counted structs to allow python interaction
 enum ParamType {
     Bool(bool),
@@ -31,16 +31,22 @@ enum ParamType {
     Struct(ParamStruct2)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct ParamList2(Vec<Param>);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct ParamStruct2(Vec<(Hash, Param)>);
 
 #[pyclass(name = "hash")]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq)]
 struct Hash {
     inner: Hash40,
+}
+
+impl PartialEq for Param {
+    fn eq(&self, other: &Self) -> bool {
+        *self.inner.lock().unwrap() == *other.inner.lock().unwrap()
+    }
 }
 
 macro_rules! conversions {
@@ -322,8 +328,7 @@ impl<'a> PyMappingProtocol<'a> for Param {
 
 #[pymethods]
 impl Hash {
-    #[new]
-    
+    #[new]    
     fn new(value: PyObject) -> PyResult<Hash> {
         let gil = Python::acquire_gil();
         let py = gil.python();
@@ -401,6 +406,18 @@ impl<'a> PyObjectProtocol<'a> for Param {
             ParamType::Struct(v) => format!("param (struct): len = {}", v.0.len()),
         }
     }
+
+    fn __repr__(&self) -> String {
+        self.__str__()
+    }
+
+    fn __richcmp__(&self, other: PyRef<Self>, co: CompareOp) -> PyResult<bool> {
+        match co {
+            CompareOp::Eq => Ok(self == &*other),
+            CompareOp::Ne => Ok(self != &*other),
+            _ => Err(PyTypeError::new_err("Only == or != comparisons valid for hash"))
+        }
+    }
 }
 
 #[pyproto]
@@ -409,4 +426,21 @@ impl<'a> PyObjectProtocol<'a> for Hash {
         // utilizes the global static labels for Hash40s
         format!("hash: {}", self.inner)
     }
+
+    fn __repr__(&self) -> String {
+        self.__str__()
+    }
+
+    fn __hash__(&self) -> u64 {
+        self.inner.0
+    }
+
+    fn __richcmp__(&self, other: PyRef<Self>, co: CompareOp) -> PyResult<bool> {
+        match co {
+            CompareOp::Eq => Ok(self == &*other),
+            CompareOp::Ne => Ok(self != &*other),
+            _ => Err(PyTypeError::new_err("Only == or != comparisons valid for hash"))
+        }
+    }
 }
+
