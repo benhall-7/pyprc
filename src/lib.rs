@@ -143,6 +143,19 @@ impl From<Hash> for ParamKind {
 fn pyprc(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Param>()?;
     m.add_class::<Hash>()?;
+    
+    m.add("PARAM_TYPE_BOOL", 1)?;
+    m.add("PARAM_TYPE_I8", 2)?;
+    m.add("PARAM_TYPE_U8", 3)?;
+    m.add("PARAM_TYPE_I16", 4)?;
+    m.add("PARAM_TYPE_U16", 5)?;
+    m.add("PARAM_TYPE_I32", 6)?;
+    m.add("PARAM_TYPE_U32", 7)?;
+    m.add("PARAM_TYPE_FLOAT", 8)?;
+    m.add("PARAM_TYPE_HASH", 9)?;
+    m.add("PARAM_TYPE_STR", 10)?;
+    m.add("PARAM_TYPE_LIST", 11)?;
+    m.add("PARAM_TYPE_STRUCT", 12)?;
     Ok(())
 }
 
@@ -193,6 +206,24 @@ impl Param {
 
     fn clone(&self) -> Self {
         Param { inner: self.inner.clone() }
+    }
+
+    #[getter]
+    fn get_type(&self) -> u8 {
+        match &*self.inner.lock().unwrap() {
+            ParamType::Bool(_) => 1,
+            ParamType::I8(_) => 2,
+            ParamType::U8(_) => 3,
+            ParamType::I16(_) => 4,
+            ParamType::U16(_) => 5,
+            ParamType::I32(_) => 6,
+            ParamType::U32(_) => 7,
+            ParamType::Float(_) => 8,
+            ParamType::Hash(_) => 9,
+            ParamType::Str(_) => 10,
+            ParamType::List(_) => 11,
+            ParamType::Struct(_) => 12,
+        }
     }
 
     #[getter]
@@ -392,18 +423,18 @@ impl PyIterProtocol for ParamIter {
 impl<'a> PyObjectProtocol<'a> for Param {
     fn __str__(&self) -> String {
         match &*self.inner.lock().unwrap() {
-            ParamType::Bool(v) => format!("param (bool): {}", v),
-            ParamType::I8(v) => format!("param (i8): {}", v),
-            ParamType::U8(v) => format!("param (u8): {}", v),
-            ParamType::I16(v) => format!("param (i16): {}", v),
-            ParamType::U16(v) => format!("param (u16): {}", v),
-            ParamType::I32(v) => format!("param (i32): {}", v),
-            ParamType::U32(v) => format!("param (u32): {}", v),
-            ParamType::Float(v) => format!("param (float): {}", v),
-            ParamType::Hash(v) => format!("param (hash): {}", v.inner),
-            ParamType::Str(v) => format!("param (str): {}", v),
-            ParamType::List(v) => format!("param (list): len = {}", v.0.len()),
-            ParamType::Struct(v) => format!("param (struct): len = {}", v.0.len()),
+            ParamType::Bool(v) => format!("param bool ({})", v),
+            ParamType::I8(v) => format!("param i8 ({})", v),
+            ParamType::U8(v) => format!("param u8 ({})", v),
+            ParamType::I16(v) => format!("param i16 ({})", v),
+            ParamType::U16(v) => format!("param u16 ({})", v),
+            ParamType::I32(v) => format!("param i32 ({})", v),
+            ParamType::U32(v) => format!("param u32 ({})", v),
+            ParamType::Float(v) => format!("param float ({})", v),
+            ParamType::Hash(v) => format!("param hash ({})", v.inner),
+            ParamType::Str(v) => format!("param str ({})", v),
+            ParamType::List(v) => format!("param list (len = {})", v.0.len()),
+            ParamType::Struct(v) => format!("param struct (len = {})", v.0.len()),
         }
     }
 
@@ -424,7 +455,7 @@ impl<'a> PyObjectProtocol<'a> for Param {
 impl<'a> PyObjectProtocol<'a> for Hash {
     fn __str__(&self) -> String {
         // utilizes the global static labels for Hash40s
-        format!("hash: {}", self.inner)
+        format!("hash ({})", self.inner)
     }
 
     fn __repr__(&self) -> String {
