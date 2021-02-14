@@ -1,7 +1,7 @@
 from pyprc import *
 
 fighter_param = param("fighter_param.prc")
-table = fighter_param["fighter_param_table"]
+table = fighter_param[hash("fighter_param_table")]
 
 mods = {
     "pzenigame": {
@@ -23,12 +23,12 @@ mods = mods_
 # actual param traversal and editing
 for fighter in table:
     # the returned value is a hash, not a string
-    fighter_name = fighter["fighter_kind"].value
+    fighter_name = fighter[hash("fighter_kind")].value
 
     if fighter_name in mods:
         fighter_mods = mods[fighter_name]
         for key in fighter_mods:
             fighter[key].value = fighter_mods[key]
 
-param.save("fighter_param_new.prc")
+fighter_param.save("fighter_param_new.prc")
 

@@ -1,10 +1,10 @@
 use std::sync::{Arc, Mutex};
 use std::vec::IntoIter;
 use prc::*;
-use prc::hash40::{Hash40, to_hash40};
+use prc::hash40::*;
 use pyo3::prelude::*;
 use pyo3::conversion::ToPyObject;
-use pyo3::class::{PyMappingProtocol, PyIterProtocol};
+use pyo3::class::{PyIterProtocol ,PyObjectProtocol, PyMappingProtocol};
 use pyo3::exceptions::{PyIndexError, PyTypeError};
 use pyo3::types::{PyList, PyTuple};
 
@@ -335,10 +335,14 @@ impl Hash {
             Err(PyTypeError::new_err("Hash constructor accepts only string or unsigned int64"))
         }
     }
-}
 
-// TODO
-// implement __iter__ on both Param and ParamIter
+    #[staticmethod]
+    fn load_labels(filepath: &str) -> PyResult<()> {
+        let labels = read_custom_labels(filepath)?;
+        set_custom_labels(labels.into_iter());
+        Ok(())
+    }
+}
 
 #[pyclass]
 struct ParamIter {
@@ -379,3 +383,30 @@ impl PyIterProtocol for ParamIter {
     }
 }
 
+#[pyproto]
+impl<'a> PyObjectProtocol<'a> for Param {
+    fn __str__(&self) -> String {
+        match &*self.inner.lock().unwrap() {
+            ParamType::Bool(v) => format!("param (bool): {}", v),
+            ParamType::I8(v) => format!("param (i8): {}", v),
+            ParamType::U8(v) => format!("param (u8): {}", v),
+            ParamType::I16(v) => format!("param (i16): {}", v),
+            ParamType::U16(v) => format!("param (u16): {}", v),
+            ParamType::I32(v) => format!("param (i32): {}", v),
+            ParamType::U32(v) => format!("param (u32): {}", v),
+            ParamType::Float(v) => format!("param (float): {}", v),
+            ParamType::Hash(v) => format!("param (hash): {}", v.inner),
+            ParamType::Str(v) => format!("param (str): {}", v),
+            ParamType::List(v) => format!("param (list): len = {}", v.0.len()),
+            ParamType::Struct(v) => format!("param (struct): len = {}", v.0.len()),
+        }
+    }
+}
+
+#[pyproto]
+impl<'a> PyObjectProtocol<'a> for Hash {
+    fn __str__(&self) -> String {
+        // utilizes the global static labels for Hash40s
+        format!("hash: {}", self.inner)
+    }
+}
