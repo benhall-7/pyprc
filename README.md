@@ -80,12 +80,16 @@ fighter_dict[hash("attack_air_landing_frame_n")] = 1
 For performing a deep-copy of any data, consider using the `clone` method:
 
 ```python
+# returns the index of the fighter
 def get_fighter(name):
-    return next(ft for ft in fighter_list if ft[hash("fighter_kind")].value == hash(name))
+    return next(i for i, ft in enumerate(fighter_list) if ft[hash("fighter_kind")].value == hash(name))
 
 samus = get_fighter("fighter_kind_samus")
 dark_samus = get_fighter("fighter_kind_samusd")
-dark_samus = samus.clone()
+fighter_list[dark_samus] = fighter_list[samus].clone()
+
+# at least this stays different
+fighter_list[dark_samus][hash("fighter_kind")].value = hash("fighter_kind_samusd")
 ```
 
 To save a param into a file, you need a param struct as the root. Any param opened from a file will be the correct root:
