@@ -9,7 +9,7 @@ use pyo3::exceptions::{PyIndexError, PyTypeError};
 use pyo3::types::{PyList, PyTuple};
 
 #[pyclass(name = "param")]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Param {
     inner: Arc<Mutex<ParamType>>,
 }
@@ -162,6 +162,12 @@ fn pyprc(_py: Python, m: &PyModule) -> PyResult<()> {
 impl Param {
     fn clone_ref(&self) -> Self {
         Param { inner: self.inner.clone() }
+    }
+}
+
+impl Clone for Param {
+    fn clone(&self) -> Self {
+        Param { inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())) }
     }
 }
 
