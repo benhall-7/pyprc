@@ -59,7 +59,7 @@ param_list[0].value //= 2
 
 # access a child param in a struct. Index must be a hash (for now)
 num_jumps = fighter_data[hash("jump_count_max")]
-num_jumps = 8
+num_jumps.value = 8
 
 # iterate a list
 for item in param_list:
@@ -74,7 +74,7 @@ for hash, item in param_struct:
 # consider first converting into a python dict to get O(1) search speed. See this example:
 
 fighter_dict = dict(fighter_data)
-fighter_dict[hash("attack_air_landing_frame_n")] = 1
+fighter_dict[hash("attack_air_landing_frame_n")].value = 1
 ```
 
 For performing a deep-copy of any data, consider using the `clone` method:
