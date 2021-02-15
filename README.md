@@ -65,6 +65,7 @@ num_jumps.value = 8
 for item in param_list:
     pass
 
+# iterate a struct
 for hash, item in param_struct:
     pass
 
