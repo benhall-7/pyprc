@@ -6,7 +6,6 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    needs: lint
     strategy:
       fail-fast: false
       matrix:
