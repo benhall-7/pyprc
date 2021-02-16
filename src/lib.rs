@@ -413,6 +413,11 @@ impl Hash {
         set_custom_labels(labels.into_iter());
         Ok(())
     }
+
+    #[getter]
+    fn get_value(&self) -> String {
+        format!("{}", self.inner)
+    }
 }
 
 #[pyclass]
