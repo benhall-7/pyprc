@@ -102,3 +102,16 @@ root.save("fighter_param_new.prc")
 ```
 
 If for some reason you construct a param file from scratch and wish to save it, the root param is required to be a struct.
+
+## TO-DO
+
+Allow ints and strings to be convertible into hashes. This simplifies syntax surrounding hash params and indexing into structs. E.g:
+
+```python
+# before
+pstruct[hash("my_param_name")].value = 42
+phash.value = hash("a_new_hash")
+# after
+pstruct["my_param_name"].value = 42
+phash.value = "converts_to_hash"
+```
