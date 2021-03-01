@@ -1,6 +1,6 @@
 # pyprc
 
-A python extension module for working with Smash Ultimate parameter (".prc") files. (TODO) Install using `pip install pyprc`. Requires python versions >= 3.6.
+A python extension module for working with Smash Ultimate parameter (".prc") files. Install using `pip install pyprc`. Packages are available for Linux, Mac, and Windows for Python 3.6 to 3.9, for 64bit versions of Python only.
 
 ## Documentation
 
@@ -28,13 +28,13 @@ p1 = param.bool(True)
 p2 = param.u32(42)
 p3 = param.str("woah, I'm using prc-rs from python!")
 
-p3 = param.hash(hash("test_hash"))
-p4 = param.list([
+p4 = param.hash(hash("test_hash"))
+p5 = param.list([
     param.u32(0),
     param.u32(45),
     param.u32(90),
 ])
-p5 = param.struct([
+p6 = param.struct([
     (hash("r"), param.u8(0)),
     (hash("g"), param.u8(80)),
     (hash("b"), param.u8(255)),
@@ -59,12 +59,13 @@ param_list[0].value //= 2
 
 # access a child param in a struct. Index must be a hash (for now)
 num_jumps = fighter_data[hash("jump_count_max")]
-num_jumps = 8
+num_jumps.value = 8
 
 # iterate a list
 for item in param_list:
     pass
 
+# iterate a struct
 for hash, item in param_struct:
     pass
 
@@ -74,18 +75,22 @@ for hash, item in param_struct:
 # consider first converting into a python dict to get O(1) search speed. See this example:
 
 fighter_dict = dict(fighter_data)
-fighter_dict[hash("attack_air_landing_frame_n")] = 1
+fighter_dict[hash("attack_air_landing_frame_n")].value = 1
 ```
 
 For performing a deep-copy of any data, consider using the `clone` method:
 
 ```python
+# returns the index of the fighter
 def get_fighter(name):
-    return next(ft for ft in fighter_list if ft[hash("fighter_kind")].value == hash(name))
+    return next(i for i, ft in enumerate(fighter_list) if ft[hash("fighter_kind")].value == hash(name))
 
 samus = get_fighter("fighter_kind_samus")
 dark_samus = get_fighter("fighter_kind_samusd")
-dark_samus = samus.clone()
+fighter_list[dark_samus] = fighter_list[samus].clone()
+
+# at least this stays different
+fighter_list[dark_samus][hash("fighter_kind")].value = hash("fighter_kind_samusd")
 ```
 
 To save a param into a file, you need a param struct as the root. Any param opened from a file will be the correct root:
@@ -97,3 +102,16 @@ root.save("fighter_param_new.prc")
 ```
 
 If for some reason you construct a param file from scratch and wish to save it, the root param is required to be a struct.
+
+## TO-DO
+
+Allow ints and strings to be convertible into hashes. This simplifies syntax surrounding hash params and indexing into structs. E.g:
+
+```python
+# before
+pstruct[hash("my_param_name")].value = 42
+phash.value = hash("a_new_hash")
+# after
+pstruct["my_param_name"].value = 42
+phash.value = "converts_to_hash"
+```

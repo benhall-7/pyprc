@@ -1,12 +1,11 @@
-use std::sync::{Arc, Mutex};
-use std::vec::IntoIter;
 use prc::*;
 use prc::hash40::*;
 use pyo3::prelude::*;
 use pyo3::conversion::IntoPy;
 use pyo3::class::{basic::CompareOp, PyIterProtocol, PyObjectProtocol, PyMappingProtocol};
 use pyo3::exceptions::{PyIndexError, PyTypeError};
-use pyo3::types::{PyList, PyTuple};
+use std::sync::{Arc, Mutex};
+use std::vec::IntoIter;
 
 #[pyclass(name = "param")]
 #[derive(Debug)]
@@ -28,7 +27,7 @@ enum ParamType {
     Hash(Hash),
     Str(String),
     List(ParamList2),
-    Struct(ParamStruct2)
+    Struct(ParamStruct2),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,7 +64,9 @@ conversions!(Bool, I8, U8, I16, U16, I32, U32, Float, Hash, Str, List, Struct);
 
 impl From<ParamKind> for Param {
     fn from(f: ParamKind) -> Self {
-        Param { inner:  Arc::new(Mutex::new(f.into())) }
+        Param {
+            inner: Arc::new(Mutex::new(f.into())),
+        }
     }
 }
 
@@ -143,7 +144,7 @@ impl From<Hash> for ParamKind {
 fn pyprc(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Param>()?;
     m.add_class::<Hash>()?;
-    
+
     m.add("PARAM_TYPE_BOOL", 1)?;
     m.add("PARAM_TYPE_I8", 2)?;
     m.add("PARAM_TYPE_U8", 3)?;
@@ -161,13 +162,17 @@ fn pyprc(_py: Python, m: &PyModule) -> PyResult<()> {
 
 impl Param {
     fn clone_ref(&self) -> Self {
-        Param { inner: self.inner.clone() }
+        Param {
+            inner: self.inner.clone(),
+        }
     }
 }
 
 impl Clone for Param {
     fn clone(&self) -> Self {
-        Param { inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())) }
+        Param {
+            inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())),
+        }
     }
 }
 
@@ -315,20 +320,21 @@ impl<'a> PyMappingProtocol<'a> for Param {
             }
             ParamType::Struct(v) => {
                 let index: Hash = key.extract(py)?;
-                let mut col: Vec<PyObject> = v.0.iter()
+                let mut col: Vec<Param> = v.0.iter()
                     .filter(|(hash, _)| *hash == index)
-                    .map(|(_, p)| p.clone_ref().into_py(py))
-                    .map(From::from)
+                    .map(|(_, p)| p.clone_ref())
                     .collect();
                 if col.is_empty() {
                     Err(PyIndexError::new_err("Hash not found in child params"))
                 } else if col.len() == 1 {
-                    Ok(col.remove(0))
+                    Ok(col.remove(0).into_py(py))
                 } else {
-                    Ok(PyList::new(py, col).into())
+                    Ok(col.into_py(py))
                 }
             }
-            _ => Err(PyTypeError::new_err("Cannot index params other than list or struct-type params")),
+            _ => Err(PyTypeError::new_err(
+                "Cannot index params other than list or struct-type params",
+            )),
         }
     }
 
@@ -338,7 +344,7 @@ impl<'a> PyMappingProtocol<'a> for Param {
         match &mut *self.inner.lock().unwrap() {
             ParamType::List(v) => {
                 let index: usize = key.extract(py)?;
-                if index >= v.0.len() { 
+                if index >= v.0.len() {
                     Err(PyIndexError::new_err("Index out of bounds").into())
                 } else {
                     let set: Param = value.extract(py)?;
@@ -348,10 +354,11 @@ impl<'a> PyMappingProtocol<'a> for Param {
             }
             ParamType::Struct(v) => {
                 let index: Hash = key.extract(py)?;
-                let mut col: Vec<&mut Param> = v.0.iter_mut()
-                    .filter(|(hash, _)| *hash == index)
-                    .map(|(_, p)| p)
-                    .collect();
+                let mut col: Vec<&mut Param> =
+                    v.0.iter_mut()
+                        .filter(|(hash, _)| *hash == index)
+                        .map(|(_, p)| p)
+                        .collect();
                 if col.is_empty() {
                     Err(PyIndexError::new_err("Hash not found in child params"))
                 } else if col.len() == 1 {
@@ -359,26 +366,34 @@ impl<'a> PyMappingProtocol<'a> for Param {
                     *col[0] = set;
                     Ok(())
                 } else {
-                    Err(PyTypeError::new_err("Cannot assign param to this hash; more than one match was found"))
+                    Err(PyTypeError::new_err(
+                        "Cannot assign param to this hash; more than one match was found",
+                    ))
                 }
             }
-            _ => Err(PyTypeError::new_err("Cannot index params other than list or struct-type params")),
+            _ => Err(PyTypeError::new_err(
+                "Cannot index params other than list or struct-type params",
+            )),
         }
     }
 }
 
 #[pymethods]
 impl Hash {
-    #[new]    
+    #[new]
     fn new(value: PyObject) -> PyResult<Hash> {
         let gil = Python::acquire_gil();
         let py = gil.python();
         if let Ok(v) = value.extract::<&str>(py) {
-            Ok(Hash { inner: to_hash40(v) })
+            Ok(Hash {
+                inner: to_hash40(v),
+            })
         } else if let Ok(v) = value.extract::<u64>(py) {
             Ok(Hash { inner: Hash40(v) })
         } else {
-            Err(PyTypeError::new_err("Hash constructor accepts only string or unsigned int64"))
+            Err(PyTypeError::new_err(
+                "Hash constructor accepts only string or unsigned int64",
+            ))
         }
     }
 
@@ -388,11 +403,16 @@ impl Hash {
         set_custom_labels(labels.into_iter());
         Ok(())
     }
+
+    #[getter]
+    fn get_value(&self) -> String {
+        format!("{}", self.inner)
+    }
 }
 
 #[pyclass]
 struct ParamIter {
-    inner: IntoIter<PyObject>
+    inner: IntoIter<PyObject>,
 }
 
 #[pyproto]
@@ -416,7 +436,9 @@ impl<'a> PyIterProtocol<'a> for Param {
                     .into_iter();
                 Py::new(py, ParamIter { inner: refs })
             }
-            _ => Err(PyTypeError::new_err("Cannot iterate params other than list or struct-type params"))
+            _ => Err(PyTypeError::new_err(
+                "Cannot iterate params other than list or struct-type params",
+            )),
         }
     }
 }
@@ -455,7 +477,9 @@ impl<'a> PyObjectProtocol<'a> for Param {
         match co {
             CompareOp::Eq => Ok(self == &*other),
             CompareOp::Ne => Ok(self != &*other),
-            _ => Err(PyTypeError::new_err("Only == or != comparisons valid for param"))
+            _ => Err(PyTypeError::new_err(
+                "Only == or != comparisons valid for param",
+            )),
         }
     }
 }
@@ -479,8 +503,9 @@ impl<'a> PyObjectProtocol<'a> for Hash {
         match co {
             CompareOp::Eq => Ok(self == &*other),
             CompareOp::Ne => Ok(self != &*other),
-            _ => Err(PyTypeError::new_err("Only == or != comparisons valid for hash"))
+            _ => Err(PyTypeError::new_err(
+                "Only == or != comparisons valid for hash",
+            )),
         }
     }
 }
-
