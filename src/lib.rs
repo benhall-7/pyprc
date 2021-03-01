@@ -3,7 +3,7 @@ use std::vec::IntoIter;
 use prc::*;
 use prc::hash40::*;
 use pyo3::prelude::*;
-use pyo3::conversion::ToPyObject;
+use pyo3::conversion::IntoPy;
 use pyo3::class::{basic::CompareOp, PyIterProtocol, PyObjectProtocol, PyMappingProtocol};
 use pyo3::exceptions::{PyIndexError, PyTypeError};
 use pyo3::types::{PyList, PyTuple};
@@ -237,16 +237,16 @@ impl Param {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let ob = match &*self.inner.lock().unwrap() {
-            ParamType::Bool(v) => v.to_object(py),
-            ParamType::I8(v) => v.to_object(py),
-            ParamType::U8(v) => v.to_object(py),
-            ParamType::I16(v) => v.to_object(py),
-            ParamType::U16(v) => v.to_object(py),
-            ParamType::I32(v) => v.to_object(py),
-            ParamType::U32(v) => v.to_object(py),
-            ParamType::Float(v) => v.to_object(py),
-            ParamType::Hash(v) => PyCell::new(py, *v).unwrap().into(),
-            ParamType::Str(v) => v.to_object(py),
+            ParamType::Bool(v) => v.into_py(py),
+            ParamType::I8(v) => v.into_py(py),
+            ParamType::U8(v) => v.into_py(py),
+            ParamType::I16(v) => v.into_py(py),
+            ParamType::U16(v) => v.into_py(py),
+            ParamType::I32(v) => v.into_py(py),
+            ParamType::U32(v) => v.into_py(py),
+            ParamType::Float(v) => v.into_py(py),
+            ParamType::Hash(v) => v.into_py(py),
+            ParamType::Str(v) => v.into_py(py),
             ParamType::List(_) => return Err(PyTypeError::new_err("Cannot access value on a list-type param")),
             ParamType::Struct(_) => return Err(PyTypeError::new_err("Cannot access value on a list-type param")),
         };
@@ -293,6 +293,14 @@ make_impl!(
 
 #[pyproto]
 impl<'a> PyMappingProtocol<'a> for Param {
+    fn __len__(&self) -> PyResult<usize> {
+        match &*self.inner.lock().unwrap() {
+            ParamType::List(v) => Ok(v.0.len()),
+            ParamType::Struct(v) => Ok(v.0.len()),
+            _ => Err(PyTypeError::new_err("Cannot get length for params other than list or struct-type params")),
+        }
+    }
+
     fn __getitem__(&self, key: PyObject) -> PyResult<PyObject> {
         let gil = Python::acquire_gil();
         let py = gil.python();
@@ -302,18 +310,14 @@ impl<'a> PyMappingProtocol<'a> for Param {
                 if index >= v.0.len() {
                     Err(PyIndexError::new_err("Index out of bounds").into())
                 } else {
-                    Ok(PyCell::new(py, Param { inner: v.0[index].inner.clone() })?.into())
+                    Ok(v.0[index].clone_ref().into_py(py))
                 }
             }
             ParamType::Struct(v) => {
                 let index: Hash = key.extract(py)?;
                 let mut col: Vec<PyObject> = v.0.iter()
                     .filter(|(hash, _)| *hash == index)
-                    .map(|(_, p)| {
-                        PyCell::new(py, Param { inner: p.inner.clone() })
-                    })
-                    .collect::<Result<Vec<_>, _>>()?
-                    .drain(..)
+                    .map(|(_, p)| p.clone_ref().into_py(py))
                     .map(From::from)
                     .collect();
                 if col.is_empty() {
@@ -399,7 +403,7 @@ impl<'a> PyIterProtocol<'a> for Param {
             ParamType::List(v) => {
                 let refs: IntoIter<PyObject> = v.0
                     .iter()
-                    .map(|p| PyCell::new(py, Param { inner: p.inner.clone() }).unwrap().into())
+                    .map(|p| p.clone_ref().into_py(py))
                     .collect::<Vec<_>>()
                     .into_iter();
                 Py::new(py, ParamIter { inner: refs })
@@ -407,8 +411,7 @@ impl<'a> PyIterProtocol<'a> for Param {
             ParamType::Struct(v) => {
                 let refs: IntoIter<PyObject> = v.0
                     .iter()
-                    .map(|(h, p)| [PyCell::new(py, *h).unwrap().into(), PyCell::new(py, p.clone_ref()).unwrap().into()])
-                    .map(|arr2: [PyObject; 2]| PyTuple::new(py, arr2.iter()).to_object(py))
+                    .map(|(h, p)| (*h, p.clone_ref()).into_py(py))
                     .collect::<Vec<_>>()
                     .into_iter();
                 Py::new(py, ParamIter { inner: refs })
@@ -452,7 +455,7 @@ impl<'a> PyObjectProtocol<'a> for Param {
         match co {
             CompareOp::Eq => Ok(self == &*other),
             CompareOp::Ne => Ok(self != &*other),
-            _ => Err(PyTypeError::new_err("Only == or != comparisons valid for hash"))
+            _ => Err(PyTypeError::new_err("Only == or != comparisons valid for param"))
         }
     }
 }
