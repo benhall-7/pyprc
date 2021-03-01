@@ -1,9 +1,9 @@
-use prc::*;
 use prc::hash40::*;
-use pyo3::prelude::*;
+use prc::*;
+use pyo3::class::{basic::CompareOp, PyIterProtocol, PyMappingProtocol, PyObjectProtocol};
 use pyo3::conversion::IntoPy;
-use pyo3::class::{basic::CompareOp, PyIterProtocol, PyObjectProtocol, PyMappingProtocol};
 use pyo3::exceptions::{PyIndexError, PyTypeError};
+use pyo3::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::vec::IntoIter;
 
@@ -302,7 +302,9 @@ impl<'a> PyMappingProtocol<'a> for Param {
         match &*self.inner.lock().unwrap() {
             ParamType::List(v) => Ok(v.0.len()),
             ParamType::Struct(v) => Ok(v.0.len()),
-            _ => Err(PyTypeError::new_err("Cannot get length for params other than list or struct-type params")),
+            _ => Err(PyTypeError::new_err(
+                "Cannot get length for params other than list or struct-type params",
+            )),
         }
     }
 
@@ -320,10 +322,11 @@ impl<'a> PyMappingProtocol<'a> for Param {
             }
             ParamType::Struct(v) => {
                 let index: Hash = key.extract(py)?;
-                let mut col: Vec<Param> = v.0.iter()
-                    .filter(|(hash, _)| *hash == index)
-                    .map(|(_, p)| p.clone_ref())
-                    .collect();
+                let mut col: Vec<Param> =
+                    v.0.iter()
+                        .filter(|(hash, _)| *hash == index)
+                        .map(|(_, p)| p.clone_ref())
+                        .collect();
                 if col.is_empty() {
                     Err(PyIndexError::new_err("Hash not found in child params"))
                 } else if col.len() == 1 {
@@ -421,19 +424,19 @@ impl<'a> PyIterProtocol<'a> for Param {
         let py = this.py();
         match &*this.inner.lock().unwrap() {
             ParamType::List(v) => {
-                let refs: IntoIter<PyObject> = v.0
-                    .iter()
-                    .map(|p| p.clone_ref().into_py(py))
-                    .collect::<Vec<_>>()
-                    .into_iter();
+                let refs: IntoIter<PyObject> =
+                    v.0.iter()
+                        .map(|p| p.clone_ref().into_py(py))
+                        .collect::<Vec<_>>()
+                        .into_iter();
                 Py::new(py, ParamIter { inner: refs })
             }
             ParamType::Struct(v) => {
-                let refs: IntoIter<PyObject> = v.0
-                    .iter()
-                    .map(|(h, p)| (*h, p.clone_ref()).into_py(py))
-                    .collect::<Vec<_>>()
-                    .into_iter();
+                let refs: IntoIter<PyObject> =
+                    v.0.iter()
+                        .map(|(h, p)| (*h, p.clone_ref()).into_py(py))
+                        .collect::<Vec<_>>()
+                        .into_iter();
                 Py::new(py, ParamIter { inner: refs })
             }
             _ => Err(PyTypeError::new_err(
