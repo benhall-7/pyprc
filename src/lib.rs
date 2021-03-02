@@ -44,7 +44,8 @@ struct Hash {
 
 impl PartialEq for Param {
     fn eq(&self, other: &Self) -> bool {
-        *self.inner.lock().unwrap() == *other.inner.lock().unwrap()
+        // if the two objects being compared are the same object, locking both will deadlock
+        Arc::ptr_eq(&self.inner, &other.inner) || *self.inner.lock().unwrap() == *other.inner.lock().unwrap()
     }
 }
 
@@ -216,7 +217,7 @@ impl Param {
     }
 
     fn clone(&self) -> Self {
-        Param { inner: self.inner.clone() }
+        Clone::clone(self)
     }
 
     #[getter]
@@ -277,6 +278,13 @@ impl Param {
             ParamType::Struct(_) => return Err(PyTypeError::new_err("Cannot assign value on a list-type param")),
         }
         Ok(())
+    }
+
+    // since python assignments never rewrite the original data in a python variable,
+    // e.g. my_var = new_param doesn't the change the object my_var points to,
+    // we make a method specifically for this
+    fn mutate(&mut self, new: &Self) {
+        *self = new.clone_ref()
     }
 }
 
