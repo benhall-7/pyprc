@@ -1,6 +1,6 @@
 [package]
 name = "pyprc"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["BenHall-7 <Benjaminjahall@gmail.com>"]
 edition = "2018"
 
