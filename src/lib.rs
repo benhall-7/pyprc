@@ -323,7 +323,7 @@ impl<'a> PyMappingProtocol<'a> for Param {
             ParamType::List(v) => {
                 let index: usize = key.extract(py)?;
                 if index >= v.0.len() {
-                    Err(PyIndexError::new_err("Index out of bounds").into())
+                    Err(PyIndexError::new_err("Index out of bounds"))
                 } else {
                     Ok(v.0[index].clone_ref().into_py(py))
                 }
@@ -356,7 +356,7 @@ impl<'a> PyMappingProtocol<'a> for Param {
             ParamType::List(v) => {
                 let index: usize = key.extract(py)?;
                 if index >= v.0.len() {
-                    Err(PyIndexError::new_err("Index out of bounds").into())
+                    Err(PyIndexError::new_err("Index out of bounds"))
                 } else {
                     let set: Param = value.extract(py)?;
                     v.0[index] = set;
@@ -416,8 +416,8 @@ impl Hash {
     }
 
     #[getter]
-    fn get_value(&self) -> String {
-        format!("{}", self.inner)
+    fn get_value(&self) -> u64 {
+        self.inner.0
     }
 }
 
@@ -499,11 +499,11 @@ impl<'a> PyObjectProtocol<'a> for Param {
 impl<'a> PyObjectProtocol<'a> for Hash {
     fn __str__(&self) -> String {
         // utilizes the global static labels for Hash40s
-        format!("hash ({})", self.inner)
+        format!("{}", self.inner)
     }
 
     fn __repr__(&self) -> String {
-        self.__str__()
+        format!("hash ({})", self.inner)
     }
 
     fn __hash__(&self) -> u64 {
