@@ -178,7 +178,7 @@ impl Clone for Param {
 }
 
 macro_rules! make_impl {
-    ($(($name:ident, $t:ty)),*) => {
+    ($(($name:ident, $set_name:ident, $t:ty)),*) => {
 
 // intentionally unindented
 
@@ -195,6 +195,10 @@ impl Param {
         fn $name(value: $t) -> Self {
             Param::from(ParamKind::from(value))
         }
+
+        fn $set_name(&mut self, value: $t) {
+            *self.inner.lock().unwrap() = ParamKind::from(value).into()
+        }
     )*
 
     #[staticmethod]
@@ -202,9 +206,17 @@ impl Param {
         Param { inner: Arc::new(Mutex::new(ParamType::List(ParamList2(value)))) }
     }
 
+    fn set_list(&mut self, value: Vec<Param>) {
+        *self.inner.lock().unwrap() = ParamType::List(ParamList2(value))
+    }
+
     #[staticmethod]
     fn r#struct(value: Vec<(Hash, Param)>) -> Self {
         Param { inner: Arc::new(Mutex::new(ParamType::Struct(ParamStruct2(value)))) }
+    }
+
+    fn set_struct(&mut self, value: Vec<(Hash, Param)>) {
+        *self.inner.lock().unwrap() = ParamType::Struct(ParamStruct2(value))
     }
 
     fn save(&self, filename: &str) -> PyResult<()> {
@@ -279,29 +291,22 @@ impl Param {
         }
         Ok(())
     }
-
-    // since python assignments never rewrite the original data in a python variable,
-    // e.g. my_var = new_param doesn't the change the object my_var points to,
-    // we make a method specifically for this
-    fn mutate(&mut self, new: &Self) {
-        *self = new.clone_ref()
-    }
 }
 
     };
 }
 
 make_impl!(
-    (bool, bool),
-    (i8, i8),
-    (u8, u8),
-    (i16, i16),
-    (u16, u16),
-    (i32, i32),
-    (u32, u32),
-    (float, f32),
-    (str, String),
-    (hash, Hash)
+    (bool, set_bool, bool),
+    (i8, set_i8, i8),
+    (u8, set_u8, u8),
+    (i16, set_i16, i16),
+    (u16, set_u16, u16),
+    (i32, set_i32, i32),
+    (u32, set_u32, u32),
+    (float, set_float, f32),
+    (str, set_str, String),
+    (hash, set_hash, Hash)
 );
 
 #[pyproto]
