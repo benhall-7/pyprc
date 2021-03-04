@@ -15,13 +15,14 @@ root = param("fighter_param.prc")
 `pyprc` also exports a `hash` class that is used for hash-type params, described below. Hashes can be constructed from strings or from their raw integer values. Printing the string representation of a hash requires an appropriate label file. See [param-labels](https://github.com/ultimate-research/param-labels). To load labels for printing, call the `load_labels` method:
 
 ```python
-name = hash("fighter_kind_pzenigame")
-print(name.value) # prints "0x16b9c57bd9"
+h = hash("fighter_kind_pzenigame")
+print(h) # prints "0x16b9c57bd9"
+
 hash.load_labels("ParamLabels.csv")
-print(name.value) # prints "fighter_kind_pzenigame"
+print(h) # prints "fighter_kind_pzenigame"
 ```
 
-Aside from files, params can also be constructed with static methods for each of the 12 possible types: `bool, i8, u8, i16, u16, i32, u32, float, hash, str, list, struct`. All types except `hash, list, struct` are able to be created using Python's built-in native types. Param hashes are constructed using the exported `hash` class; param lists are constructed using arrays of params; and param structs are constructed with arrays of hash-param tuples:
+Aside from files, params can also be constructed with static methods for each of the 12 possible types: `bool, i8, u8, i16, u16, i32, u32, float, hash, str, list, struct`. All types except `hash, list, struct` are able to be created using Python's built-in native types. Param hashes are constructed using the exported `hash` class; param lists are constructed using a list of params; and param structs are constructed with a list of hash-param tuples:
 
 ```python
 p1 = param.bool(True)
@@ -47,6 +48,17 @@ For all params except lists and structs, you can access and set the values with 
 p = param.u8(42)
 p.value += 1
 print(p.value) # 43
+```
+
+Params provide instance methods that can change the identity of a param outside of just the value field. This is most useful for changing properties of param lists or structs such as length or order, but can technically be used to change any param to any other type of param. The syntax is nearly identical to the 12 param constructors, but begins with "set_", such as `set_bool` or `set_struct`, and takes the same values as the constructors:
+
+```python
+plist = param.list([param.u32(1), param.u32(2), param.u32(3)])
+real_list = list(plist)
+real_list.extend([param.u32(5), param.u32(8)])
+plist.set_list(real_list)
+for p in plist:
+    print(p.value) # will print 1, 2, 3, 5, 8
 ```
 
 You can access the raw param type number using the `type` field. You can compare it using the constants exported from pyprc, e.g: `PARAM_TYPE_BOOL`, `PARAM_TYPE_STRUCT`, etc.
@@ -113,5 +125,5 @@ pstruct[hash("my_param_name")].value = 42
 phash.value = hash("a_new_hash")
 # after
 pstruct["my_param_name"].value = 42
-phash.value = "converts_to_hash"
+phash.value = "a_new_hash"
 ```
