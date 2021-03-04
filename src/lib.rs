@@ -45,7 +45,8 @@ struct Hash {
 impl PartialEq for Param {
     fn eq(&self, other: &Self) -> bool {
         // if the two objects being compared are the same object, locking both will deadlock
-        Arc::ptr_eq(&self.inner, &other.inner) || *self.inner.lock().unwrap() == *other.inner.lock().unwrap()
+        Arc::ptr_eq(&self.inner, &other.inner)
+            || *self.inner.lock().unwrap() == *other.inner.lock().unwrap()
     }
 }
 
@@ -202,21 +203,41 @@ impl Param {
     )*
 
     #[staticmethod]
-    fn list(value: Vec<Param>) -> Self {
-        Param { inner: Arc::new(Mutex::new(ParamType::List(ParamList2(value)))) }
+    fn list(mut value: Vec<PyRef<Self>>) -> Self {
+        Param {
+            inner: Arc::new(Mutex::new(ParamType::List(ParamList2(value
+                .drain(..)
+                .map(|p| p.clone_ref())
+                .collect()
+            ))))
+        }
     }
 
-    fn set_list(&mut self, value: Vec<Param>) {
-        *self.inner.lock().unwrap() = ParamType::List(ParamList2(value))
+    fn set_list(&mut self, mut value: Vec<PyRef<Self>>) {
+        *self.inner.lock().unwrap() = ParamType::List(ParamList2(value
+            .drain(..)
+            .map(|p| p.clone_ref())
+            .collect()
+        ))
     }
 
     #[staticmethod]
-    fn r#struct(value: Vec<(Hash, Param)>) -> Self {
-        Param { inner: Arc::new(Mutex::new(ParamType::Struct(ParamStruct2(value)))) }
+    fn r#struct(mut value: Vec<(Hash, PyRef<Self>)>) -> Self {
+        Param {
+            inner: Arc::new(Mutex::new(ParamType::Struct(ParamStruct2(value
+                .drain(..)
+                .map(|(h, p)| (h, p.clone_ref()))
+                .collect()
+            ))))
+        }
     }
 
-    fn set_struct(&mut self, value: Vec<(Hash, Param)>) {
-        *self.inner.lock().unwrap() = ParamType::Struct(ParamStruct2(value))
+    fn set_struct(&mut self, mut value: Vec<(Hash, PyRef<Self>)>) {
+        *self.inner.lock().unwrap() = ParamType::Struct(ParamStruct2(value
+            .drain(..)
+            .map(|(h, p)| (h, p.clone_ref()))
+            .collect()
+        ))
     }
 
     fn save(&self, filename: &str) -> PyResult<()> {
