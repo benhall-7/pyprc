@@ -2,7 +2,7 @@ use prc::hash40::*;
 use prc::*;
 use pyo3::class::{basic::CompareOp, PyIterProtocol, PyMappingProtocol, PyObjectProtocol};
 use pyo3::conversion::IntoPy;
-use pyo3::exceptions::{PyIndexError, PyTypeError};
+use pyo3::exceptions::{PyIndexError, PyLookupError, PyTypeError};
 use pyo3::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::vec::IntoIter;
@@ -422,8 +422,12 @@ impl Hash {
         let gil = Python::acquire_gil();
         let py = gil.python();
         if let Ok(v) = value.extract::<&str>(py) {
-            Ok(Hash {
-                inner: to_hash40(v),
+            let labels = Hash40::label_map();
+            let lock = labels.lock().unwrap();
+            lock.hash_of(v).map(|hash| hash.into()).ok_or_else(|| {
+                PyLookupError::new_err(
+                    "Could not convert this string into a hash. The label map does not contain the string, and is using strict conversion"
+                )
             })
         } else if let Ok(v) = value.extract::<u64>(py) {
             Ok(Hash { inner: Hash40(v) })
@@ -435,10 +439,23 @@ impl Hash {
     }
 
     #[staticmethod]
+    fn algo(string: &str) -> Hash {
+        hash40(string).into()
+    }
+
+    #[staticmethod]
     fn load_labels(filepath: &str) -> PyResult<()> {
-        let labels = read_custom_labels(filepath)?;
-        set_custom_labels(labels.into_iter());
+        let label_map = Hash40::label_map();
+        let mut labels = label_map.lock().unwrap();
+        labels.add_custom_labels_from_path(filepath).unwrap();
         Ok(())
+    }
+
+    #[staticmethod]
+    fn set_strict(strict: bool) {
+        let label_map = Hash40::label_map();
+        let mut lock = label_map.lock().unwrap();
+        lock.strict = strict;
     }
 
     #[getter]
