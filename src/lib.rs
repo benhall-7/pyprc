@@ -1,6 +1,6 @@
 use prc::hash40::*;
 use prc::*;
-use pyo3::class::{basic::CompareOp, PyIterProtocol, PyMappingProtocol, PyObjectProtocol};
+use pyo3::class::basic::CompareOp;
 use pyo3::conversion::IntoPy;
 use pyo3::exceptions::{PyIndexError, PyLookupError, PyTypeError};
 use pyo3::prelude::*;
@@ -272,9 +272,7 @@ impl Param {
     }
 
     #[getter]
-    fn get_value(&self) -> PyResult<PyObject> {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
+    fn get_value(&self, py: Python) -> PyResult<PyObject> {
         let ob = match &*self.inner.lock().unwrap() {
             ParamType::Bool(v) => v.into_py(py),
             ParamType::I8(v) => v.into_py(py),
@@ -293,9 +291,7 @@ impl Param {
     }
 
     #[setter]
-    fn set_value(&mut self, value: PyObject) -> PyResult<()> {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
+    fn set_value(&mut self, py: Python, value: PyObject) -> PyResult<()> {
         match &mut *self.inner.lock().unwrap() {
             ParamType::Bool(v) => *v = value.extract(py)?,
             ParamType::I8(v) => *v = value.extract(py)?,
@@ -330,8 +326,8 @@ make_impl!(
     (hash, set_hash, Hash)
 );
 
-#[pyproto]
-impl<'a> PyMappingProtocol<'a> for Param {
+#[pymethods]
+impl Param {
     fn __len__(&self) -> PyResult<usize> {
         match &*self.inner.lock().unwrap() {
             ParamType::List(v) => Ok(v.0.len()),
@@ -342,9 +338,7 @@ impl<'a> PyMappingProtocol<'a> for Param {
         }
     }
 
-    fn __getitem__(&self, key: PyObject) -> PyResult<PyObject> {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
+    fn __getitem__(&self, py: Python, key: PyObject) -> PyResult<PyObject> {
         match &*self.inner.lock().unwrap() {
             ParamType::List(v) => {
                 let index: usize = key.extract(py)?;
@@ -375,9 +369,7 @@ impl<'a> PyMappingProtocol<'a> for Param {
         }
     }
 
-    fn __setitem__(&mut self, key: PyObject, value: PyObject) -> PyResult<()> {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
+    fn __setitem__(&mut self, py: Python, key: PyObject, value: PyObject) -> PyResult<()> {
         match &mut *self.inner.lock().unwrap() {
             ParamType::List(v) => {
                 let index: usize = key.extract(py)?;
@@ -413,14 +405,43 @@ impl<'a> PyMappingProtocol<'a> for Param {
             )),
         }
     }
+
+    fn __str__(&self) -> String {
+        match &*self.inner.lock().unwrap() {
+            ParamType::Bool(v) => format!("param bool ({})", v),
+            ParamType::I8(v) => format!("param i8 ({})", v),
+            ParamType::U8(v) => format!("param u8 ({})", v),
+            ParamType::I16(v) => format!("param i16 ({})", v),
+            ParamType::U16(v) => format!("param u16 ({})", v),
+            ParamType::I32(v) => format!("param i32 ({})", v),
+            ParamType::U32(v) => format!("param u32 ({})", v),
+            ParamType::Float(v) => format!("param float ({})", v),
+            ParamType::Hash(v) => format!("param hash ({})", v.inner),
+            ParamType::Str(v) => format!("param str ({})", v),
+            ParamType::List(v) => format!("param list (len = {})", v.0.len()),
+            ParamType::Struct(v) => format!("param struct (len = {})", v.0.len()),
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        self.__str__()
+    }
+
+    fn __richcmp__(&self, other: PyRef<Self>, co: CompareOp) -> PyResult<bool> {
+        match co {
+            CompareOp::Eq => Ok(self == &*other),
+            CompareOp::Ne => Ok(self != &*other),
+            _ => Err(PyTypeError::new_err(
+                "Only == or != comparisons valid for param",
+            )),
+        }
+    }
 }
 
 #[pymethods]
 impl Hash {
     #[new]
-    fn new(value: PyObject) -> PyResult<Hash> {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
+    fn new(py: Python, value: PyObject) -> PyResult<Hash> {
         if let Ok(v) = value.extract::<&str>(py) {
             let labels = Hash40::label_map();
             let lock = labels.lock().unwrap();
@@ -462,6 +483,29 @@ impl Hash {
     fn get_value(&self) -> u64 {
         self.inner.0
     }
+
+    fn __str__(&self) -> String {
+        // utilizes the global static labels for Hash40s
+        format!("{}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("hash ({})", self.inner)
+    }
+
+    fn __hash__(&self) -> u64 {
+        self.inner.0
+    }
+
+    fn __richcmp__(&self, other: PyRef<Self>, co: CompareOp) -> PyResult<bool> {
+        match co {
+            CompareOp::Eq => Ok(self == &*other),
+            CompareOp::Ne => Ok(self != &*other),
+            _ => Err(PyTypeError::new_err(
+                "Only == or != comparisons valid for hash",
+            )),
+        }
+    }
 }
 
 #[pyclass]
@@ -469,8 +513,8 @@ struct ParamIter {
     inner: IntoIter<PyObject>,
 }
 
-#[pyproto]
-impl<'a> PyIterProtocol<'a> for Param {
+#[pymethods]
+impl Param {
     fn __iter__(this: PyRef<Self>) -> PyResult<Py<ParamIter>> {
         let py = this.py();
         match &*this.inner.lock().unwrap() {
@@ -497,69 +541,9 @@ impl<'a> PyIterProtocol<'a> for Param {
     }
 }
 
-#[pyproto]
-impl PyIterProtocol for ParamIter {
+#[pymethods]
+impl ParamIter {
     fn __next__(mut this: PyRefMut<Self>) -> PyResult<Option<PyObject>> {
         Ok(this.inner.next())
-    }
-}
-
-#[pyproto]
-impl<'a> PyObjectProtocol<'a> for Param {
-    fn __str__(&self) -> String {
-        match &*self.inner.lock().unwrap() {
-            ParamType::Bool(v) => format!("param bool ({})", v),
-            ParamType::I8(v) => format!("param i8 ({})", v),
-            ParamType::U8(v) => format!("param u8 ({})", v),
-            ParamType::I16(v) => format!("param i16 ({})", v),
-            ParamType::U16(v) => format!("param u16 ({})", v),
-            ParamType::I32(v) => format!("param i32 ({})", v),
-            ParamType::U32(v) => format!("param u32 ({})", v),
-            ParamType::Float(v) => format!("param float ({})", v),
-            ParamType::Hash(v) => format!("param hash ({})", v.inner),
-            ParamType::Str(v) => format!("param str ({})", v),
-            ParamType::List(v) => format!("param list (len = {})", v.0.len()),
-            ParamType::Struct(v) => format!("param struct (len = {})", v.0.len()),
-        }
-    }
-
-    fn __repr__(&self) -> String {
-        self.__str__()
-    }
-
-    fn __richcmp__(&self, other: PyRef<Self>, co: CompareOp) -> PyResult<bool> {
-        match co {
-            CompareOp::Eq => Ok(self == &*other),
-            CompareOp::Ne => Ok(self != &*other),
-            _ => Err(PyTypeError::new_err(
-                "Only == or != comparisons valid for param",
-            )),
-        }
-    }
-}
-
-#[pyproto]
-impl<'a> PyObjectProtocol<'a> for Hash {
-    fn __str__(&self) -> String {
-        // utilizes the global static labels for Hash40s
-        format!("{}", self.inner)
-    }
-
-    fn __repr__(&self) -> String {
-        format!("hash ({})", self.inner)
-    }
-
-    fn __hash__(&self) -> u64 {
-        self.inner.0
-    }
-
-    fn __richcmp__(&self, other: PyRef<Self>, co: CompareOp) -> PyResult<bool> {
-        match co {
-            CompareOp::Eq => Ok(self == &*other),
-            CompareOp::Ne => Ok(self != &*other),
-            _ => Err(PyTypeError::new_err(
-                "Only == or != comparisons valid for hash",
-            )),
-        }
     }
 }
