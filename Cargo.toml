@@ -2,7 +2,7 @@
 name = "pyprc"
 version = "0.3.1"
 authors = ["BenHall-7 <Benjaminjahall@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "pyprc"
@@ -10,5 +10,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 prc-rs = "1.5.2"
-pyo3 = { version = "0.13.1", features = ["extension-module"] }
+pyo3 = { version = "0.23.3", features = ["extension-module", "multiple-pymethods"] }
+
+[build-dependencies]
+pyo3-build-config = "0.23.3"
 
