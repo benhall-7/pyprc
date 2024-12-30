@@ -143,7 +143,7 @@ impl From<Hash> for ParamKind {
 }
 
 #[pymodule]
-fn pyprc(_py: Python, m: &PyModule) -> PyResult<()> {
+fn pyprc(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Param>()?;
     m.add_class::<Hash>()?;
 

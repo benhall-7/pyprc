@@ -10,8 +10,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 prc-rs = "1.5.2"
-pyo3 = { version = "0.20.3", features = ["extension-module", "multiple-pymethods"] }
+pyo3 = { version = "0.23.3", features = ["extension-module", "multiple-pymethods"] }
 
 [build-dependencies]
-pyo3-build-config = "0.20.3"
+pyo3-build-config = "0.23.3"
 
