@@ -131,9 +131,9 @@ p_struct = param.struct([("dummy", param.u8(1))])
 p_struct["dummy"].value = 2
 ```
 
-```python
 Ex 2:
 
+```python
 # old
 p_hash = param.hash(hash("dummy"))
 p_hash.value = hash("test")
