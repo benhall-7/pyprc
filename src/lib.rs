@@ -508,10 +508,10 @@ impl Param {
 impl Hash {
     #[new]
     fn new(py: Python, value: PyObject) -> PyResult<Hash> {
-        if let Ok(v) = value.extract::<&str>(py) {
+        if let Ok(v) = value.extract::<String>(py) {
             let labels = Hash40::label_map();
             let lock = labels.lock().unwrap();
-            lock.hash_of(v).map(|hash| hash.into()).ok_or_else(|| {
+            lock.hash_of(&v).map(|hash| hash.into()).ok_or_else(|| {
                 PyLookupError::new_err(
                     "Could not convert this string into a hash. The label map does not contain the string, and is using strict conversion"
                 )
