@@ -223,8 +223,8 @@ impl Param {
         Param::from(ParamKind::from(value))
     }
     #[staticmethod]
-    fn hash(value: Hash) -> Self {
-        Param::from(ParamKind::from(value))
+    fn hash(value: IntoHash) -> Self {
+        Param::from(ParamKind::from(Into::<Hash>::into(value)))
     }
 
     #[staticmethod]
@@ -353,7 +353,7 @@ impl Param {
             ParamType::I32(v) => *v = value.extract(py)?,
             ParamType::U32(v) => *v = value.extract(py)?,
             ParamType::Float(v) => *v = value.extract(py)?,
-            ParamType::Hash(v) => *v = value.extract(py)?,
+            ParamType::Hash(v) => *v = value.extract::<IntoHash>(py)?.into(),
             ParamType::Str(v) => *v = value.extract(py)?,
             ParamType::List(_) => {
                 return Err(PyTypeError::new_err(
@@ -390,8 +390,7 @@ impl Param {
                 }
             }
             ParamType::Struct(v) => {
-                let index: Hash = key.extract(py).or_else(|_| Hash::new(py, key))?;
-
+                let index: Hash = key.extract::<IntoHash>(py)?.into();
                 let mut col: Vec<Param> =
                     v.0.iter()
                         .filter(|(hash, _)| hash.inner == index.inner)
@@ -424,8 +423,7 @@ impl Param {
                 }
             }
             ParamType::Struct(v) => {
-                let index: Hash = key.extract(py).or_else(|_| Hash::new(py, key))?;
-
+                let index: Hash = key.extract::<IntoHash>(py)?.into();
                 let mut col: Vec<&mut Param> =
                     v.0.iter_mut()
                         .filter(|(hash, _)| *hash == index)
@@ -510,21 +508,9 @@ impl Param {
 impl Hash {
     #[new]
     fn new(py: Python, value: PyObject) -> PyResult<Hash> {
-        if let Ok(v) = value.extract::<String>(py) {
-            let labels = Hash40::label_map();
-            let lock = labels.lock().unwrap();
-            lock.hash_of(&v).map(|hash| hash.into()).ok_or_else(|| {
-                PyLookupError::new_err(
-                    "Could not convert this string into a hash. The label map does not contain the string, and is using strict conversion"
-                )
-            })
-        } else if let Ok(v) = value.extract::<u64>(py) {
-            Ok(Hash { inner: Hash40(v) })
-        } else {
-            Err(PyTypeError::new_err(
-                "Hash constructor accepts only string or unsigned int64",
-            ))
-        }
+        value
+            .extract::<IntoHash>(py)
+            .map(|wrapper| Into::<Hash>::into(wrapper))
     }
 
     #[staticmethod]
@@ -573,6 +559,38 @@ impl Hash {
                 "Only == or != comparisons valid for hash",
             )),
         }
+    }
+}
+
+/// A wrapper struct that allows automatic conversion of strings, numbers, or other hash classes
+/// into the hash class
+struct IntoHash(Hash);
+
+impl<'py> FromPyObject<'py> for IntoHash {
+    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+        if let Ok(v) = ob.downcast::<Hash>() {
+            Ok(IntoHash(v.try_borrow()?.clone()))
+        } else if let Ok(v) = ob.extract::<String>() {
+            let labels = Hash40::label_map();
+            let lock = labels.lock().unwrap();
+            lock.hash_of(&v).map(|hash| IntoHash(hash.into())).ok_or_else(|| {
+                PyLookupError::new_err(
+                    "Could not convert this string into a hash. The label map does not contain the string, and is using strict conversion"
+                )
+            })
+        } else if let Ok(v) = ob.extract::<u64>() {
+            Ok(IntoHash(Hash { inner: Hash40(v) }))
+        } else {
+            Err(PyTypeError::new_err(
+                "Hash constructor accepts only Hash, string, or unsigned int64",
+            ))
+        }
+    }
+}
+
+impl Into<Hash> for IntoHash {
+    fn into(self) -> Hash {
+        self.0
     }
 }
 
