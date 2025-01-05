@@ -25,4 +25,3 @@ for fighter in table:
             fighter[key].value = fighter_mods[key]
 
 fighter_param.save("fighter_param_new.prc")
-

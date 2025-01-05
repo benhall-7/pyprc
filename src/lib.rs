@@ -1,3 +1,4 @@
+use duplicate::Duplicate;
 use prc::hash40::*;
 use prc::*;
 use pyo3::class::basic::CompareOp;
@@ -7,13 +8,15 @@ use pyo3::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::vec::IntoIter;
 
+mod duplicate;
+
 #[pyclass(name = "param")]
 #[derive(Debug)]
 struct Param {
     inner: Arc<Mutex<ParamType>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 /// an enum designed to store sub-params as reference counted structs to allow python interaction
 enum ParamType {
     Bool(bool),
@@ -30,14 +33,14 @@ enum ParamType {
     Struct(ParamStruct2),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 struct ParamList2(Vec<Param>);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 struct ParamStruct2(Vec<(Hash, Param)>);
 
 #[pyclass(name = "hash")]
-#[derive(Debug, Copy, Clone, Hash, PartialEq)]
+#[derive(Debug, Hash, PartialEq)]
 struct Hash {
     inner: Hash40,
 }
@@ -94,7 +97,7 @@ impl From<&Param> for ParamKind {
     fn from(f: &Param) -> Self {
         let mutex = &*f.inner;
         let param_type = &*mutex.lock().unwrap();
-        ParamKind::from(&param_type.clone())
+        ParamKind::from(&(param_type.duplicate()))
     }
 }
 
@@ -173,7 +176,7 @@ impl Param {
 impl Clone for Param {
     fn clone(&self) -> Self {
         Param {
-            inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())),
+            inner: Arc::new(Mutex::new(self.inner.lock().unwrap().duplicate())),
         }
     }
 }
@@ -223,8 +226,8 @@ impl Param {
         Param::from(ParamKind::from(value))
     }
     #[staticmethod]
-    fn hash(value: IntoHash) -> Self {
-        Param::from(ParamKind::from(Into::<Hash>::into(value)))
+    fn hash(value: Hash) -> Self {
+        Param::from(ParamKind::from(value))
     }
 
     #[staticmethod]
@@ -331,7 +334,7 @@ impl Param {
             ParamType::I32(v) => v.into_py_any(py),
             ParamType::U32(v) => v.into_py_any(py),
             ParamType::Float(v) => v.into_py_any(py),
-            ParamType::Hash(v) => v.into_py_any(py),
+            ParamType::Hash(v) => v.duplicate().into_py_any(py),
             ParamType::Str(v) => v.into_py_any(py),
             ParamType::List(_) => Err(PyTypeError::new_err(
                 "Cannot access value on a list-type param",
@@ -353,7 +356,7 @@ impl Param {
             ParamType::I32(v) => *v = value.extract(py)?,
             ParamType::U32(v) => *v = value.extract(py)?,
             ParamType::Float(v) => *v = value.extract(py)?,
-            ParamType::Hash(v) => *v = value.extract::<IntoHash>(py)?.into(),
+            ParamType::Hash(v) => *v = value.extract(py)?,
             ParamType::Str(v) => *v = value.extract(py)?,
             ParamType::List(_) => {
                 return Err(PyTypeError::new_err(
@@ -390,7 +393,7 @@ impl Param {
                 }
             }
             ParamType::Struct(v) => {
-                let index: Hash = key.extract::<IntoHash>(py)?.into();
+                let index: Hash = key.extract(py)?;
                 let mut col: Vec<Param> =
                     v.0.iter()
                         .filter(|(hash, _)| hash.inner == index.inner)
@@ -423,7 +426,7 @@ impl Param {
                 }
             }
             ParamType::Struct(v) => {
-                let index: Hash = key.extract::<IntoHash>(py)?.into();
+                let index: Hash = key.extract(py)?;
                 let mut col: Vec<&mut Param> =
                     v.0.iter_mut()
                         .filter(|(hash, _)| *hash == index)
@@ -492,7 +495,7 @@ impl Param {
             ParamType::Struct(v) => {
                 let refs: IntoIter<PyObject> =
                     v.0.iter()
-                        .map(|(h, p)| (*h, p.clone_ref()).into_py_any(py))
+                        .map(|(h, p)| (h.duplicate(), p.clone_ref()).into_py_any(py))
                         .collect::<Result<Vec<_>, _>>()?
                         .into_iter();
                 Py::new(py, ParamIter { inner: refs })
@@ -509,7 +512,7 @@ impl Hash {
     #[new]
     fn new(py: Python, value: PyObject) -> PyResult<Hash> {
         value
-            .extract::<IntoHash>(py)
+            .extract::<Hash>(py)
             .map(|wrapper| Into::<Hash>::into(wrapper))
     }
 
@@ -562,35 +565,25 @@ impl Hash {
     }
 }
 
-/// A wrapper struct that allows automatic conversion of strings, numbers, or other hash classes
-/// into the hash class
-struct IntoHash(Hash);
-
-impl<'py> FromPyObject<'py> for IntoHash {
+impl<'py> FromPyObject<'py> for Hash {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         if let Ok(v) = ob.downcast::<Hash>() {
-            Ok(IntoHash(v.try_borrow()?.clone()))
+            Ok(v.try_borrow()?.duplicate())
         } else if let Ok(v) = ob.extract::<String>() {
             let labels = Hash40::label_map();
             let lock = labels.lock().unwrap();
-            lock.hash_of(&v).map(|hash| IntoHash(hash.into())).ok_or_else(|| {
+            lock.hash_of(&v).map(|hash| hash.into()).ok_or_else(|| {
                 PyLookupError::new_err(
                     "Could not convert this string into a hash. The label map does not contain the string, and is using strict conversion"
                 )
             })
         } else if let Ok(v) = ob.extract::<u64>() {
-            Ok(IntoHash(Hash { inner: Hash40(v) }))
+            Ok(Hash { inner: Hash40(v) })
         } else {
             Err(PyTypeError::new_err(
                 "Hash constructor accepts only Hash, string, or unsigned int64",
             ))
         }
-    }
-}
-
-impl Into<Hash> for IntoHash {
-    fn into(self) -> Hash {
-        self.0
     }
 }
 
