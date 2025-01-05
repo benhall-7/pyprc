@@ -390,10 +390,11 @@ impl Param {
                 }
             }
             ParamType::Struct(v) => {
-                let index: Hash = key.extract(py)?;
+                let index: Hash = key.extract(py).or_else(|_| Hash::new(py, key))?;
+
                 let mut col: Vec<Param> =
                     v.0.iter()
-                        .filter(|(hash, _)| *hash == index)
+                        .filter(|(hash, _)| hash.inner == index.inner)
                         .map(|(_, p)| p.clone_ref())
                         .collect();
                 if col.is_empty() {
@@ -423,7 +424,8 @@ impl Param {
                 }
             }
             ParamType::Struct(v) => {
-                let index: Hash = key.extract(py)?;
+                let index: Hash = key.extract(py).or_else(|_| Hash::new(py, key))?;
+
                 let mut col: Vec<&mut Param> =
                     v.0.iter_mut()
                         .filter(|(hash, _)| *hash == index)
