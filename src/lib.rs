@@ -1,7 +1,7 @@
 use prc::hash40::*;
 use prc::*;
 use pyo3::class::basic::CompareOp;
-use pyo3::conversion::{IntoPyObject, IntoPyObjectExt};
+use pyo3::conversion::IntoPyObjectExt;
 use pyo3::exceptions::{PyIndexError, PyLookupError, PyTypeError};
 use pyo3::prelude::*;
 use std::sync::{Arc, Mutex};
