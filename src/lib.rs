@@ -1,7 +1,7 @@
 use prc::hash40::*;
 use prc::*;
 use pyo3::class::basic::CompareOp;
-use pyo3::conversion::IntoPy;
+use pyo3::conversion::{IntoPyObject, IntoPyObjectExt};
 use pyo3::exceptions::{PyIndexError, PyLookupError, PyTypeError};
 use pyo3::prelude::*;
 use std::sync::{Arc, Mutex};
@@ -178,11 +178,6 @@ impl Clone for Param {
     }
 }
 
-macro_rules! make_impl {
-    ($(($name:ident, $set_name:ident, $t:ty)),*) => {
-
-// intentionally unindented
-
 #[pymethods]
 impl Param {
     #[new]
@@ -191,52 +186,104 @@ impl Param {
         Ok(p.into())
     }
 
-    $(
-        #[staticmethod]
-        fn $name(value: $t) -> Self {
-            Param::from(ParamKind::from(value))
-        }
-
-        fn $set_name(&mut self, value: $t) {
-            *self.inner.lock().unwrap() = ParamKind::from(value).into()
-        }
-    )*
+    #[staticmethod]
+    fn bool(value: bool) -> Self {
+        Param::from(ParamKind::from(value))
+    }
+    #[staticmethod]
+    fn i8(value: i8) -> Self {
+        Param::from(ParamKind::from(value))
+    }
+    #[staticmethod]
+    fn u8(value: u8) -> Self {
+        Param::from(ParamKind::from(value))
+    }
+    #[staticmethod]
+    fn i16(value: i16) -> Self {
+        Param::from(ParamKind::from(value))
+    }
+    #[staticmethod]
+    fn u16(value: u16) -> Self {
+        Param::from(ParamKind::from(value))
+    }
+    #[staticmethod]
+    fn i32(value: i32) -> Self {
+        Param::from(ParamKind::from(value))
+    }
+    #[staticmethod]
+    fn u32(value: u32) -> Self {
+        Param::from(ParamKind::from(value))
+    }
+    #[staticmethod]
+    fn float(value: f32) -> Self {
+        Param::from(ParamKind::from(value))
+    }
+    #[staticmethod]
+    fn str(value: String) -> Self {
+        Param::from(ParamKind::from(value))
+    }
+    #[staticmethod]
+    fn hash(value: Hash) -> Self {
+        Param::from(ParamKind::from(value))
+    }
 
     #[staticmethod]
     fn list(mut value: Vec<PyRef<Self>>) -> Self {
         Param {
-            inner: Arc::new(Mutex::new(ParamType::List(ParamList2(value
-                .drain(..)
-                .map(|p| p.clone_ref())
-                .collect()
-            ))))
+            inner: Arc::new(Mutex::new(ParamType::List(ParamList2(
+                value.drain(..).map(|p| p.clone_ref()).collect(),
+            )))),
         }
-    }
-
-    fn set_list(&mut self, mut value: Vec<PyRef<Self>>) {
-        *self.inner.lock().unwrap() = ParamType::List(ParamList2(value
-            .drain(..)
-            .map(|p| p.clone_ref())
-            .collect()
-        ))
     }
 
     #[staticmethod]
     fn r#struct(mut value: Vec<(Hash, PyRef<Self>)>) -> Self {
         Param {
-            inner: Arc::new(Mutex::new(ParamType::Struct(ParamStruct2(value
-                .drain(..)
-                .map(|(h, p)| (h, p.clone_ref()))
-                .collect()
-            ))))
+            inner: Arc::new(Mutex::new(ParamType::Struct(ParamStruct2(
+                value.drain(..).map(|(h, p)| (h, p.clone_ref())).collect(),
+            )))),
         }
     }
 
+    fn set_bool(&mut self, value: bool) {
+        *self.inner.lock().unwrap() = ParamKind::from(value).into()
+    }
+    fn set_i8(&mut self, value: i8) {
+        *self.inner.lock().unwrap() = ParamKind::from(value).into()
+    }
+    fn set_u8(&mut self, value: u8) {
+        *self.inner.lock().unwrap() = ParamKind::from(value).into()
+    }
+    fn set_i16(&mut self, value: i16) {
+        *self.inner.lock().unwrap() = ParamKind::from(value).into()
+    }
+    fn set_u16(&mut self, value: u16) {
+        *self.inner.lock().unwrap() = ParamKind::from(value).into()
+    }
+    fn set_i32(&mut self, value: i32) {
+        *self.inner.lock().unwrap() = ParamKind::from(value).into()
+    }
+    fn set_u32(&mut self, value: u32) {
+        *self.inner.lock().unwrap() = ParamKind::from(value).into()
+    }
+    fn set_float(&mut self, value: f32) {
+        *self.inner.lock().unwrap() = ParamKind::from(value).into()
+    }
+    fn set_str(&mut self, value: String) {
+        *self.inner.lock().unwrap() = ParamKind::from(value).into()
+    }
+    fn set_hash(&mut self, value: Hash) {
+        *self.inner.lock().unwrap() = ParamKind::from(value).into()
+    }
+
+    fn set_list(&mut self, mut value: Vec<PyRef<Self>>) {
+        *self.inner.lock().unwrap() =
+            ParamType::List(ParamList2(value.drain(..).map(|p| p.clone_ref()).collect()))
+    }
+
     fn set_struct(&mut self, mut value: Vec<(Hash, PyRef<Self>)>) {
-        *self.inner.lock().unwrap() = ParamType::Struct(ParamStruct2(value
-            .drain(..)
-            .map(|(h, p)| (h, p.clone_ref()))
-            .collect()
+        *self.inner.lock().unwrap() = ParamType::Struct(ParamStruct2(
+            value.drain(..).map(|(h, p)| (h, p.clone_ref())).collect(),
         ))
     }
 
@@ -245,7 +292,9 @@ impl Param {
             save(filename, &ps2.into())?;
             Ok(())
         } else {
-            Err(PyTypeError::new_err("Only struct-type Params can be saved to a file"))
+            Err(PyTypeError::new_err(
+                "Only struct-type Params can be saved to a file",
+            ))
         }
     }
 
@@ -273,21 +322,24 @@ impl Param {
 
     #[getter]
     fn get_value(&self, py: Python) -> PyResult<PyObject> {
-        let ob = match &*self.inner.lock().unwrap() {
-            ParamType::Bool(v) => v.into_py(py),
-            ParamType::I8(v) => v.into_py(py),
-            ParamType::U8(v) => v.into_py(py),
-            ParamType::I16(v) => v.into_py(py),
-            ParamType::U16(v) => v.into_py(py),
-            ParamType::I32(v) => v.into_py(py),
-            ParamType::U32(v) => v.into_py(py),
-            ParamType::Float(v) => v.into_py(py),
-            ParamType::Hash(v) => v.into_py(py),
-            ParamType::Str(v) => v.into_py(py),
-            ParamType::List(_) => return Err(PyTypeError::new_err("Cannot access value on a list-type param")),
-            ParamType::Struct(_) => return Err(PyTypeError::new_err("Cannot access value on a list-type param")),
-        };
-        Ok(ob)
+        match &*self.inner.lock().unwrap() {
+            ParamType::Bool(v) => v.into_py_any(py),
+            ParamType::I8(v) => v.into_py_any(py),
+            ParamType::U8(v) => v.into_py_any(py),
+            ParamType::I16(v) => v.into_py_any(py),
+            ParamType::U16(v) => v.into_py_any(py),
+            ParamType::I32(v) => v.into_py_any(py),
+            ParamType::U32(v) => v.into_py_any(py),
+            ParamType::Float(v) => v.into_py_any(py),
+            ParamType::Hash(v) => v.into_py_any(py),
+            ParamType::Str(v) => v.into_py_any(py),
+            ParamType::List(_) => Err(PyTypeError::new_err(
+                "Cannot access value on a list-type param",
+            )),
+            ParamType::Struct(_) => Err(PyTypeError::new_err(
+                "Cannot access value on a list-type param",
+            )),
+        }
     }
 
     #[setter]
@@ -303,31 +355,20 @@ impl Param {
             ParamType::Float(v) => *v = value.extract(py)?,
             ParamType::Hash(v) => *v = value.extract(py)?,
             ParamType::Str(v) => *v = value.extract(py)?,
-            ParamType::List(_) => return Err(PyTypeError::new_err("Cannot assign value on a list-type param")),
-            ParamType::Struct(_) => return Err(PyTypeError::new_err("Cannot assign value on a list-type param")),
+            ParamType::List(_) => {
+                return Err(PyTypeError::new_err(
+                    "Cannot assign value on a list-type param",
+                ))
+            }
+            ParamType::Struct(_) => {
+                return Err(PyTypeError::new_err(
+                    "Cannot assign value on a list-type param",
+                ))
+            }
         }
         Ok(())
     }
-}
 
-    };
-}
-
-make_impl!(
-    (bool, set_bool, bool),
-    (i8, set_i8, i8),
-    (u8, set_u8, u8),
-    (i16, set_i16, i16),
-    (u16, set_u16, u16),
-    (i32, set_i32, i32),
-    (u32, set_u32, u32),
-    (float, set_float, f32),
-    (str, set_str, String),
-    (hash, set_hash, Hash)
-);
-
-#[pymethods]
-impl Param {
     fn __len__(&self) -> PyResult<usize> {
         match &*self.inner.lock().unwrap() {
             ParamType::List(v) => Ok(v.0.len()),
@@ -345,7 +386,7 @@ impl Param {
                 if index >= v.0.len() {
                     Err(PyIndexError::new_err("Index out of bounds"))
                 } else {
-                    Ok(v.0[index].clone_ref().into_py(py))
+                    v.0[index].clone_ref().into_py_any(py)
                 }
             }
             ParamType::Struct(v) => {
@@ -358,9 +399,9 @@ impl Param {
                 if col.is_empty() {
                     Err(PyIndexError::new_err("Hash not found in child params"))
                 } else if col.len() == 1 {
-                    Ok(col.remove(0).into_py(py))
+                    col.remove(0).into_py_any(py)
                 } else {
-                    Ok(col.into_py(py))
+                    col.into_py_any(py)
                 }
             }
             _ => Err(PyTypeError::new_err(
@@ -433,6 +474,31 @@ impl Param {
             CompareOp::Ne => Ok(self != &*other),
             _ => Err(PyTypeError::new_err(
                 "Only == or != comparisons valid for param",
+            )),
+        }
+    }
+
+    fn __iter__(this: PyRef<Self>) -> PyResult<Py<ParamIter>> {
+        let py = this.py();
+        match &*this.inner.lock().unwrap() {
+            ParamType::List(v) => {
+                let refs: IntoIter<PyObject> =
+                    v.0.iter()
+                        .map(|p| p.clone_ref().into_py_any(py))
+                        .collect::<Result<Vec<_>, _>>()?
+                        .into_iter();
+                Py::new(py, ParamIter { inner: refs })
+            }
+            ParamType::Struct(v) => {
+                let refs: IntoIter<PyObject> =
+                    v.0.iter()
+                        .map(|(h, p)| (*h, p.clone_ref()).into_py_any(py))
+                        .collect::<Result<Vec<_>, _>>()?
+                        .into_iter();
+                Py::new(py, ParamIter { inner: refs })
+            }
+            _ => Err(PyTypeError::new_err(
+                "Cannot iterate params other than list or struct-type params",
             )),
         }
     }
@@ -511,34 +577,6 @@ impl Hash {
 #[pyclass]
 struct ParamIter {
     inner: IntoIter<PyObject>,
-}
-
-#[pymethods]
-impl Param {
-    fn __iter__(this: PyRef<Self>) -> PyResult<Py<ParamIter>> {
-        let py = this.py();
-        match &*this.inner.lock().unwrap() {
-            ParamType::List(v) => {
-                let refs: IntoIter<PyObject> =
-                    v.0.iter()
-                        .map(|p| p.clone_ref().into_py(py))
-                        .collect::<Vec<_>>()
-                        .into_iter();
-                Py::new(py, ParamIter { inner: refs })
-            }
-            ParamType::Struct(v) => {
-                let refs: IntoIter<PyObject> =
-                    v.0.iter()
-                        .map(|(h, p)| (*h, p.clone_ref()).into_py(py))
-                        .collect::<Vec<_>>()
-                        .into_iter();
-                Py::new(py, ParamIter { inner: refs })
-            }
-            _ => Err(PyTypeError::new_err(
-                "Cannot iterate params other than list or struct-type params",
-            )),
-        }
-    }
 }
 
 #[pymethods]
