@@ -1,6 +1,6 @@
 # pyprc
 
-A python extension module for working with Smash Ultimate parameter (".prc") files. Install using `pip install pyprc`. Packages are available for Linux, Mac, and Windows for Python 3.6 to 3.9, for 64bit versions of Python only.
+A python extension module for working with Smash Ultimate parameter (".prc") files. Install using `pip install pyprc`. Packages are available for Linux, Mac, and Windows for Python 3.7+ (for 64bit versions of Python only).
 
 ## Documentation
 
